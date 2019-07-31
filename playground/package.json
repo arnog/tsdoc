@@ -7,7 +7,7 @@
   "scripts": {
     "build": "node build.js --production",
     "start": "node node_modules/webpack-dev-server/bin/webpack-dev-server --config webpack.dev.config.js --open",
-    "lint": "eslint src/**/*.ts"
+    "lint": "eslint src/**/*.ts -f unix"
   },
   "dependencies": {
     "@microsoft/tsdoc": "0.12.11",
