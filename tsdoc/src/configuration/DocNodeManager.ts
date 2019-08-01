@@ -1,6 +1,7 @@
 import { DocNode } from '../nodes/DocNode';
 import { StringChecks } from '../parser/StringChecks';
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type DocNodeConstructor = new (...args: any[]) => DocNode;
 
 export interface IDocNodeDefinition {

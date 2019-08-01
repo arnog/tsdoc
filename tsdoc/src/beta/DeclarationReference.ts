@@ -411,7 +411,7 @@ export abstract class ComponentPathBase {
   }
 
   public addNavigationStep(this: ComponentPath, navigation: Navigation, component: ComponentLike): ComponentPath {
-    // tslint:disable-next-line:no-use-before-declare
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
     return new ComponentNavigation(this, navigation, Component.from(component));
   }
 
