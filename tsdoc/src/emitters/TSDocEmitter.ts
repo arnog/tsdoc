@@ -42,6 +42,8 @@ enum LineState {
 export class TSDocEmitter {
   public readonly eol: string = '\n';
 
+  private _wordWrapColumn: number = 20;
+
   // Whether to emit the /** */ framing
   private _emitCommentFraming: boolean = true;
 
@@ -50,6 +52,10 @@ export class TSDocEmitter {
   // This state machine is used by the writer functions to generate the /** */ framing around the emitted lines
   private _lineState: LineState = LineState.Closed;
 
+  private _outputLine: number = 1;
+
+  private _outputColumn: number = 1;
+
   // State for _ensureLineSkipped()
   private _previousLineHadContent: boolean = false;
 
@@ -57,6 +63,21 @@ export class TSDocEmitter {
   // But sometimes we want the paragraph to be attached to the previous element, e.g. when it's part of
   // an "@param" block.  Setting _hangingParagraph=true accomplishes that.
   private _hangingParagraph: boolean = false;
+
+  /**
+   * If nonzero, text is word-wrapped to prevent the text from exceeding the specified column.
+   * A value of 0 disables word-wrapping.
+   */
+  public get wordWrapColumn(): number {
+    return this._wordWrapColumn;
+  }
+
+  public set wordWrapColumn(value: number) {
+    if (value < 0) {
+      throw new Error('The wordWrapColumn value must be a positive integer');
+    }
+    this._wordWrapColumn = value;
+  }
 
   public renderComment(output: IStringBuilder, docComment: DocComment): void {
     this._emitCommentFraming = true;
@@ -75,6 +96,8 @@ export class TSDocEmitter {
 
   private _renderCompleteObject(output: IStringBuilder, docNode: DocNode): void {
     this._output = output;
+    this._outputLine = 1;
+    this._outputColumn = 1;
 
     this._lineState = LineState.Closed;
     this._previousLineHadContent = false;
@@ -369,42 +392,51 @@ export class TSDocEmitter {
     }
   }
 
-  // Writes literal text content.  If it contains newlines, they will automatically be converted to
-  // _writeNewline() calls, to ensure that "*" is written at the start of each line.
+  // Writes literal text content.  If it contains newlines, they will be parsed
+  // to ensure that "*" is written at the start of each line.
   private _writeContent(content: string | undefined): void {
     if (content === undefined || content.length === 0) {
       return;
     }
 
     const splitLines: string[] = content.split(/\r?\n/g);
-    if (splitLines.length > 1) {
-      let firstLine: boolean = true;
-      for (const line of splitLines) {
-        if (firstLine) {
-          firstLine = false;
-        } else {
-          this._writeNewline();
-        }
-        this._writeContent(line);
+    if (splitLines.length <= 1) {
+      this._writeContentWithoutNewline(content);
+      return;
+    }
+    let firstLine: boolean = true;
+    for (const line of splitLines) {
+      if (firstLine) {
+        firstLine = false;
+      } else {
+        this._writeNewline();
       }
+      this._writeContentWithoutNewline(line);
+    }
+  }
+
+  // Assumes that "content" does not contain any newlines
+  private _writeContentWithoutNewline(content: string): void {
+    if (content.length === 0) {
       return;
     }
 
     if (this._lineState === LineState.Closed) {
       if (this._emitCommentFraming) {
-        this._output!.append('/**' + this.eol
-          + ' *');
+        this._internalWriteWithoutNewline('/**');
+        this._internalWriteNewline();
+        this._internalWriteWithoutNewline(' *');
       }
       this._lineState = LineState.StartOfLine;
     }
 
     if (this._lineState === LineState.StartOfLine) {
       if (this._emitCommentFraming) {
-        this._output!.append(' ');
+        this._internalWriteWithoutNewline(' ');
       }
     }
 
-    this._output!.append(content);
+    this._internalWriteWithoutNewline(content);
     this._lineState = LineState.MiddleOfLine;
     this._previousLineHadContent = true;
   }
@@ -413,8 +445,9 @@ export class TSDocEmitter {
   private _writeNewline(): void {
     if (this._lineState === LineState.Closed) {
       if (this._emitCommentFraming) {
-        this._output!.append('/**' + this.eol
-          + ' *');
+        this._internalWriteWithoutNewline('/**');
+        this._internalWriteNewline();
+        this._internalWriteWithoutNewline(' *');
       }
       this._lineState = LineState.StartOfLine;
     }
@@ -422,9 +455,10 @@ export class TSDocEmitter {
     this._previousLineHadContent = this._lineState === LineState.MiddleOfLine;
 
     if (this._emitCommentFraming) {
-      this._output!.append(this.eol + ' *');
+      this._internalWriteNewline();
+      this._internalWriteWithoutNewline(' *');
     } else {
-      this._output!.append(this.eol);
+      this._internalWriteNewline();
     }
 
     this._lineState = LineState.StartOfLine;
@@ -441,9 +475,24 @@ export class TSDocEmitter {
 
     if (this._lineState !== LineState.Closed) {
       if (this._emitCommentFraming) {
-        this._output!.append('/' + this.eol);
+        this._internalWriteWithoutNewline('/');
+        this._internalWriteNewline();
       }
       this._lineState = LineState.Closed;
     }
+  }
+
+  private _internalWriteWithoutNewline(text: string) {
+    if (text.indexOf('\n') >= 0) {
+      throw new Error('ASSERTION FAILED: _internalWriteWithoutNewline()');
+    }
+    this._output!.append(text);
+    this._outputColumn += text.length;
+  }
+
+  private _internalWriteNewline() {
+    this._output!.append(this.eol);
+    ++this._outputLine;
+    this._outputColumn = 1;
   }
 }
