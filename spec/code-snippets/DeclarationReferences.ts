@@ -121,7 +121,7 @@ export class ClassA1 {
 
 /**
  * Shortest name:  {@link B1.B2.B3}
- * Full name:      {@link (B1:namespace).(B2:namespace).(B3:namespace)S}
+ * Full name:      {@link (B1:namespace).(B2:namespace).(B3:namespace)}
  */
 export namespace B1.B2.B3 {
   /**
